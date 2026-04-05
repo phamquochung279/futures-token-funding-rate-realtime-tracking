@@ -1,3 +1,10 @@
-venv
+.venv
+.vscode
 __pycache__
 .idea
+logs
+kafka_stream_test.ipynb
+docker-compose-final-ver.yml
+spark_stream.py
+top_tokens_by_funding_rate.py
+Data engineering architecture.png

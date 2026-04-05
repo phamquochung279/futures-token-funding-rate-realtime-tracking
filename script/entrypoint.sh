@@ -1,22 +1,18 @@
 #!/bin/bash
 set -e
 
-if [ -e "/opt/airflow/requirements.txt" ]; then
-  $(command python) pip install --upgrade pip
-  $(command -v pip) install --user -r requirements.txt
+if [ -e "/opt/airflow/requirements-dags.txt" ]; then
+  python -m pip install --user -q -r /opt/airflow/requirements-dags.txt
 fi
 
-if [ ! -f "/opt/airflow/airflow.db" ]; then
-  airflow db init && \
-  airflow users create \
-    --username admin \
-    --firstname admin \
-    --lastname admin \
-    --role Admin \
-    --email admin@example.com \
-    --password admin
-fi
-
-$(command -v airflow) db upgrade
+airflow db upgrade
+airflow users create \
+  --username admin \
+  --firstname admin \
+  --lastname admin \
+  --role Admin \
+  --email admin@example.com \
+  --password admin \
+  2>/dev/null || true
 
 exec airflow webserver
