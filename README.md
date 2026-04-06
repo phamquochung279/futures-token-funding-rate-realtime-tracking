@@ -24,7 +24,7 @@ Project này dựa trên 1 task cũ của tôi ở ATX: giúp community manager 
 
 Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ những kỷ niệm 1 thời trong ngành crypto cùng ATX. Những ngày gian khổ nhưng đáng nhớ.
 
-<video src="20250208171938_upload.mp4" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/7286d209-e0df-46ad-956d-fe963b4dbbe0" controls width="100%"></video>
 
 <p align="center"><em>Tôi (trái) & những người đồng đội ATX ở sự kiện GM Vietnam 2025</em></p>
 
