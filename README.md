@@ -123,3 +123,9 @@ docker-compose down
 
 - ATX API hiện chỉ còn 7 tokens nên `BATCH_SIZE` 10 và `BATCH_DELAY` 10s giữa các batch chỉ để tượng trưng, không có ảnh hưởng thực tế đến cách project hoạt động.
 - Nếu số lượng token tăng lên, cần điều chỉnh `BATCH_SIZE` và `BATCH_DELAY` trong [dags/kafka_stream.py](dags/kafka_stream.py) để tránh bị block IP.
+
+## Contact
+
+Author: Phạm Quốc Hùng <br />
+
+<a href="mailto:pham.quochung0999@gmail.com">![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)</a> <a href="https://public.tableau.com/app/profile/hung.pham279">![Tableau](https://img.shields.io/badge/Tableau-E97627?style=for-the-badge&logo=Tableau&logoColor=white)</a> <a href="https://github.com/phamquochung279">![Github](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)</a> <a href="https://www.linkedin.com/in/pham-quochung/">![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)</a>
