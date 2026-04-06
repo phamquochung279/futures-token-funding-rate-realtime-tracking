@@ -105,7 +105,9 @@ services:
       retries: 5
 
   webserver:
-    image: apache/airflow:2.6.0-python3.9
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     command: webserver
     entrypoint: ['/opt/airflow/script/entrypoint.sh']
     depends_on:
@@ -123,7 +125,6 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-      - ./requirements-dags.txt:/opt/airflow/requirements-dags.txt
       - ./logs:/opt/airflow/logs
     ports:
       - "8080:8080"
@@ -137,21 +138,21 @@ services:
       - confluent
 
   scheduler:
-    image: apache/airflow:2.6.0-python3.9
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     depends_on:
       webserver:
         condition: service_healthy
     volumes:
       - ./dags:/opt/airflow/dags
-      - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-      - ./requirements-dags.txt:/opt/airflow/requirements-dags.txt
       - ./logs:/opt/airflow/logs
     environment:
       - LOAD_EX=n
       - EXECUTOR=Sequential
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-    command: bash -c "pip install -q -r /opt/airflow/requirements-dags.txt && airflow db upgrade && airflow scheduler"
+    command: bash -c "airflow db upgrade && airflow scheduler"
     networks:
       - confluent
 
@@ -191,7 +192,9 @@ services:
       retries: 5
 
   consumer:
-    image: python:3.9-slim
+    build:
+      context: consumers
+      dockerfile: Dockerfile
     container_name: consumer
     restart: always
     depends_on:
@@ -199,10 +202,6 @@ services:
         condition: service_healthy
       postgres_data:
         condition: service_healthy
-    volumes:
-      - ./consumers/kafka_consumer.py:/app/kafka_consumer.py
-    working_dir: /app
-    command: bash -c "pip install -q kafka-python psycopg2-binary && python kafka_consumer.py"
     networks:
       - confluent
 

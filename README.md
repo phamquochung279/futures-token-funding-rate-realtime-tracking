@@ -47,13 +47,13 @@ pip install -r requirements.txt
 
 Đừng nhầm với [requirements-dags.txt](requirements-dags.txt) — file này là các package bổ sung cho các Airflow containers (`webserver` & `scheduler`) trong Docker.
 
-* Dựng các services bằng Docker Compose:
+* Build images và dựng các services bằng Docker Compose:
 
 ```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
 
-> Lần đầu chạy sẽ mất vài phút để pull images. Các service khởi động theo thứ tự:
+> Lần đầu chạy sẽ mất vài phút để build images ([Dockerfile.airflow](Dockerfile.airflow), [consumers/Dockerfile](consumers/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
 > `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer`
 
 * Kiểm tra tất cả services đã healthy:
