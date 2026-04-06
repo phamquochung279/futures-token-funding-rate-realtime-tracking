@@ -2,7 +2,9 @@
 
 ## 1. Project Flow
 
-[![ATX Funding Rates Project Architecture](ATX%20Funding%20Rates%20Project%20Architecture.png "ATX Funding Rates Project Architecture")](ATX%20Funding%20Rates%20Project%20Architecture.png "ATX Funding Rates Project Architecture")
+<a href="ATX%20Funding%20Rates%20Project%20Architecture.png" target="_blank">
+  <img src="ATX%20Funding%20Rates%20Project%20Architecture.png" alt="ATX Funding Rates Project Architecture" title="ATX Funding Rates Project Architecture" width="100%">
+</a>
 
 ## 2. Background Story
 
