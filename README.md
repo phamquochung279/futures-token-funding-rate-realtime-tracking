@@ -1,10 +1,10 @@
 # ATX Futures Tokens' Funding Rates
 
-## 0. Project Flow
+## 1. Project Flow
 
 [![ATX Funding Rates Project Architecture](ATX%20Funding%20Rates%20Project%20Architecture.png "ATX Funding Rates Project Architecture")](ATX%20Funding%20Rates%20Project%20Architecture.png "ATX Funding Rates Project Architecture")
 
-## 1. Background Story
+## 2. Background Story
 
 Trong crypto futures có 1 cơ chế là *phí funding* để giúp giá futures & giá spot của 1 token (coin) luôn bám sát nhau. Ngắn gọn mà nói cơ chế này hoạt động như sau:
 
@@ -20,13 +20,13 @@ Vì vậy, để tận dụng cơ chế này, các traders nhiều kinh nghiệm
 
 Project này dựa trên 1 task cũ của tôi ở ATX: giúp community manager "săn lùng" các tokens đang có funding rates tốt --> loan tin tới các "cá mập" (khách hàng VIP) nhanh nhất có thể --> thúc đẩy các vị này trade nhiều hơn.
 
-Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ những kỷ niệm 1 thời phiêu lưu trong ngành crypto cùng ATX.
+Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ những kỷ niệm 1 thời trong ngành crypto cùng ATX. Những ngày gian khổ nhưng đáng nhớ.
 
 <video src="20250208171938_upload.mp4" controls width="100%"></video>
 
 <p align="center"><em>Tôi (trái) & những người đồng đội ATX ở sự kiện GM Vietnam 2025</em></p>
 
-## 2. Setup & Run Locally
+## 3. Setup & Run Locally
 
 * Cài đặt [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
 
@@ -89,7 +89,7 @@ docker-compose down
 
 ---
 
-## 3. Lưu ý khi chạy project trên Production
+## 4. Lưu ý khi chạy project trên Production
 
 ### Security
 
