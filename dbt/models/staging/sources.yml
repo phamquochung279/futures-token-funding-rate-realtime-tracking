@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: trading
+    database: trading
+    schema: public
+    tables:
+      - name: funding_rates
+        description: "Raw funding rates ingested from Kafka consumer"
+        columns:
+          - name: id
+            description: "Auto-increment primary key"
+          - name: base_asset_id
+            description: "Numeric ID of the token on ATX"
+          - name: base_asset
+            description: "Token symbol (e.g. BTC, ETH)"
+          - name: funding_rate
+            description: "Funding rate value. Negative = shorts pay longs"
+          - name: event_time
+            description: "Unix timestamp in milliseconds from ATX API"
+          - name: ingested_at
+            description: "Timestamp when the row was inserted by the consumer"

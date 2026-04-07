@@ -1,0 +1,12 @@
+atx_funding_rates:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres_data
+      port: 5432
+      user: trading
+      password: trading
+      dbname: trading
+      schema: public
+      threads: 1
