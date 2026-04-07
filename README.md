@@ -31,6 +31,7 @@ Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ nhữ
 ## 3. Setup & Run Locally
 
 * Cài đặt và chạy [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+* Cài đặt và chạy [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
 
 * Clone repo về máy:
 
@@ -53,6 +54,8 @@ pip install -r requirements.txt
 docker-compose up -d --build
 ```
 
+> Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile), [dbt/Dockerfile](dbt/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
+> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer` → `dbt`
 > Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile), [dbt/Dockerfile](dbt/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
 > `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer` → `dbt`
 
