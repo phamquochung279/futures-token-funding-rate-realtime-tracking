@@ -1,0 +1,37 @@
+version: 2
+
+models:
+  - name: fct_funding_rates
+    description: >
+      Enriched funding rates with ATX alert-level categories and an
+      is_attractive flag for tokens worth notifying VIP clients about.
+    columns:
+      - name: id
+        description: "Primary key from source table"
+        tests:
+          - not_null
+      - name: base_asset
+        description: "Token symbol"
+        tests:
+          - not_null
+      - name: funding_rate
+        description: "Funding rate value (never null in this model)"
+        tests:
+          - not_null
+      - name: funding_rate_category
+        description: "Alert-level category based on ATX thresholds"
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'critical'
+                - 'very_negative'
+                - 'negative'
+                - 'watch'
+                - 'slightly_negative'
+                - 'neutral'
+                - 'positive'
+      - name: is_attractive
+        description: "True when funding_rate <= -0.3 (long entry opportunity)"
+        tests:
+          - not_null

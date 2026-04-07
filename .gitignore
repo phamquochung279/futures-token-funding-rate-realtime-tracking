@@ -9,3 +9,6 @@ docker-compose-final-ver.yml
 spark_stream.py
 top_tokens_by_funding_rate.py
 Data engineering architecture.png
+dbt/target/
+dbt/.user.yml
+dbt/logs/

@@ -30,7 +30,7 @@ Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ nhữ
 
 ## 3. Setup & Run Locally
 
-* Cài đặt [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+* Cài đặt và chạy [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
 
 * Clone repo về máy:
 
@@ -53,8 +53,8 @@ pip install -r requirements.txt
 docker-compose up -d --build
 ```
 
-> Lần đầu chạy sẽ mất vài phút để build images ([Dockerfile.airflow](Dockerfile.airflow), [consumers/Dockerfile](consumers/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
-> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer`
+> Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile), [dbt/Dockerfile](dbt/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
+> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer` → `dbt`
 
 * Kiểm tra tất cả services đã healthy:
 
@@ -80,6 +80,26 @@ docker-compose ps
 ```bash
 docker exec -it postgres_data psql -U trading -d trading -c "SELECT * FROM funding_rates ORDER BY ingested_at DESC LIMIT 20;"
 ```
+
+* Service `dbt` sẽ tự động chạy **mỗi 60 giây**, transform data từ bảng `funding_rates` thành bảng mart `fct_funding_rates`.
+
+  | Model | Materialization | Mô tả |
+  |---|---|---|
+  | `stg_funding_rates` | view | Lọc rows `funding_rate IS NULL`, convert `event_time` (ms) → `event_at` (timestamptz) |
+  | `fct_funding_rates` | table | Thêm `funding_rate_category` theo ngưỡng `-0.3/-0.8/-1.2/-2`, thêm cờ `is_attractive` |
+
+  Kiểm tra bảng mart:
+
+  ```bash
+  docker exec -it postgres_data psql -U trading -d trading -c "SELECT base_asset, funding_rate, funding_rate_category, is_attractive FROM fct_funding_rates ORDER BY funding_rate ASC;"
+  ```
+
+  Chạy dbt thủ công (debug, test):
+
+  ```bash
+  docker-compose run --rm dbt dbt run
+  docker-compose run --rm dbt dbt test
+  ```
 
 * (Optional) Dừng toàn bộ services sau khi dùng xong:
 

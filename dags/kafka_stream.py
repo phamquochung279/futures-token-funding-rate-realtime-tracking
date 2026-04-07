@@ -14,7 +14,7 @@ def _fetch_one_funding_rate(row):
     asset_code = row["assetCode"]
     api_url = (
         f"https://api.atxs.io/api/v1/futures/mark_price"
-        f"?baseAssetId={asset_id}&quoteAssetId=617"
+        f"?baseAssetId={asset_id}&quoteAssetId=20"
     )
     fallback = {
         "baseAssetId": asset_id,
@@ -51,7 +51,7 @@ def get_funding_rates():
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Step 1: Get the list of current futures listed tokens
-    config_url = "https://api.atxs.io/api/v1/futures/config"
+    config_url = "https://api.atxs.io/api/v1/futures/config?isGetFullPair=true"
     try:
         cfg_resp = requests.get(config_url, timeout=10)
     except Exception:
@@ -79,8 +79,8 @@ def get_funding_rates():
     futures_listed_tokens.sort(key=lambda x: x["assetCode"])
 
     # Step 2: Fetch funding rates in parallel, one batch at a time
-    BATCH_SIZE = 10
-    BATCH_DELAY = 10 
+    BATCH_SIZE = 60
+    BATCH_DELAY = 90 
     
     # seconds between batches (to avoid rate limiting)
     # there's only 7 assets left at the moment, so these 2 configs don't do anything.
@@ -93,14 +93,20 @@ def get_funding_rates():
     with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
         for batch_idx, batch in enumerate(batches):
             batch_futures = {executor.submit(_fetch_one_funding_rate, row): row for row in batch}
+            batch_ok = 0
+            batch_err = 0
             for fut in as_completed(batch_futures):
                 record = fut.result()
                 if record.get("fundingRate") is not None:
                     ok_count += 1
+                    batch_ok += 1
+                else:
+                    batch_err += 1
                 yield record
 
+            print(f"Batch {batch_idx + 1}/{len(batches)}: {batch_ok} success, {batch_err} failed.")
             if batch_idx < len(batches) - 1:
-                print(f"Batch {batch_idx + 1}/{len(batches)} done. Waiting {BATCH_DELAY}s before next batch...")
+                print(f"Waiting {BATCH_DELAY}s before next batch...")
                 time.sleep(BATCH_DELAY)
 
     print(f"Completed. Successfully retrieved funding rates for {ok_count} out of {n} assets")
@@ -112,6 +118,7 @@ def stream_data():
 
     producer = KafkaProducer(
         bootstrap_servers=['broker:29092']
+        # bootstrap_servers=['localhost:9092'] -- For local testing without Airflow
     )
     try:
         for record in get_funding_rates():
@@ -124,13 +131,14 @@ def stream_data():
     finally:
         producer.close()
 
+# For local testing without Airflow.
 # if __name__ == '__main__':
 #     stream_data()
 
 with DAG(
     'funding_rates_automation',
     default_args=default_args,
-    schedule=timedelta(minutes=1),
+    schedule=timedelta(minutes=15),
     catchup=False,
 ) as dag:
 
