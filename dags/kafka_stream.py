@@ -1,6 +1,8 @@
 from datetime import datetime, timezone, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.sensors.python import PythonSensor
+from airflow.operators.bash import BashOperator
 
 default_args = {
     'owner': 'phamquochung279',
@@ -80,10 +82,7 @@ def get_funding_rates():
 
     # Step 2: Fetch funding rates in parallel, one batch at a time
     BATCH_SIZE = 60
-    BATCH_DELAY = 90 
-    
-    # seconds between batches (to avoid rate limiting)
-    # there's only 7 assets left at the moment, so these 2 configs don't do anything.
+    BATCH_DELAY = 90     # seconds between batches (to avoid rate limiting)
 
     n = len(futures_listed_tokens)
     batches = [futures_listed_tokens[i:i + BATCH_SIZE] for i in range(0, n, BATCH_SIZE)]
@@ -120,10 +119,12 @@ def stream_data():
         bootstrap_servers=['broker:29092']
         # bootstrap_servers=['localhost:9092'] -- For local testing without Airflow
     )
+    total_sent = 0
     try:
         for record in get_funding_rates():
             key = record.get('baseAsset', '').encode('utf-8')
             producer.send('funding_rates', key=key, value=json.dumps(record).encode('utf-8'))
+            total_sent += 1
         producer.flush()
     except Exception as e:
         logging.error(f'An error occured: {e}')
@@ -131,9 +132,37 @@ def stream_data():
     finally:
         producer.close()
 
+    print(f"Total records sent to Kafka: {total_sent}")
+    return total_sent  # pushed to XCom automatically
+
 # For local testing without Airflow.
 # if __name__ == '__main__':
 #     stream_data()
+
+
+def _wait_for_consumer(**context):
+    """Return True when the consumer has inserted ALL rows for this DAG run."""
+    import psycopg2
+    logical_date = context["data_interval_start"]
+    ti = context["ti"]
+    expected = ti.xcom_pull(task_ids="stream_data_from_api")
+    if not expected:
+        expected = 1
+
+    conn = psycopg2.connect(
+        host="postgres_data", port=5432,
+        dbname="trading", user="trading", password="trading",
+    )
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM funding_rates WHERE ingested_at > %s",
+        (logical_date,),
+    )
+    count = cursor.fetchone()[0]
+    conn.close()
+    print(f"Rows inserted since {logical_date}: {count} / {expected}")
+    return count >= expected
+
 
 with DAG(
     'funding_rates_automation',
@@ -144,5 +173,24 @@ with DAG(
 
     streaming_task = PythonOperator(
         task_id='stream_data_from_api',
-        python_callable=stream_data
+        python_callable=stream_data,
     )
+
+    wait_for_consumer = PythonSensor(
+        task_id='wait_for_consumer',
+        python_callable=_wait_for_consumer,
+        poke_interval=5,    # Check every 5 seconds
+        timeout=300,        # Give up after 5 minutes
+        mode='poke',
+    )
+
+    dbt_run = BashOperator(
+        task_id='dbt_run',
+        bash_command=(
+            'dbt run '
+            '--profiles-dir /opt/airflow/dbt '
+            '--project-dir /opt/airflow/dbt'
+        ),
+    )
+
+    streaming_task >> wait_for_consumer >> dbt_run

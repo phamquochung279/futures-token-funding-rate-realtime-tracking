@@ -124,6 +124,7 @@ services:
         max-file: "3"
     volumes:
       - ./dags:/opt/airflow/dags
+      - ./dbt:/opt/airflow/dbt
       - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
       - ./logs:/opt/airflow/logs
     ports:
@@ -146,6 +147,7 @@ services:
         condition: service_healthy
     volumes:
       - ./dags:/opt/airflow/dags
+      - ./dbt:/opt/airflow/dbt
       - ./logs:/opt/airflow/logs
     environment:
       - LOAD_EX=n
@@ -202,24 +204,6 @@ services:
         condition: service_healthy
       postgres_data:
         condition: service_healthy
-    networks:
-      - confluent
-
-  dbt:
-    build:
-      context: dbt
-      dockerfile: Dockerfile
-    container_name: dbt
-    depends_on:
-      postgres_data:
-        condition: service_healthy
-    volumes:
-      - ./dbt:/usr/app/dbt
-    environment:
-      - DBT_PROFILES_DIR=/usr/app/dbt
-    # Runs dbt every 60s, aligned with the Airflow DAG schedule.
-    # To run manually: docker-compose run --rm dbt dbt run
-    command: bash -c "while true; do dbt run && dbt test; sleep 60; done"
     networks:
       - confluent
 

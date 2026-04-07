@@ -31,9 +31,8 @@ Tôi làm project này vừa để ôn lại skill, vừa để lưu giữ nhữ
 ## 3. Setup & Run Locally
 
 * Cài đặt và chạy [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
-* Cài đặt và chạy [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
 
-* Clone repo về máy:
+* Clone repo này về máy local:
 
 ```bash
 git clone <repo-url>
@@ -46,7 +45,7 @@ cd notable-tokens-realtime-tracking
 pip install -r requirements.txt
 ```
 
-Đừng nhầm với [requirements-dags.txt](requirements-dags.txt) — file này là các package bổ sung cho các Airflow containers (`webserver` & `scheduler`) trong Docker.
+> Đừng nhầm với [requirements-dags.txt](requirements-dags.txt) — file đó là các package bổ sung cho các Airflow containers (`webserver` & `scheduler`) trong Docker.
 
 * Build images và dựng các services bằng Docker Compose:
 
@@ -54,10 +53,8 @@ pip install -r requirements.txt
 docker-compose up -d --build
 ```
 
-> Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile), [dbt/Dockerfile](dbt/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
-> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer` → `dbt`
-> Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile), [dbt/Dockerfile](dbt/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
-> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer` → `dbt`
+> Lần đầu chạy sẽ mất vài phút để build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile)) và pull các images còn lại. Các service khởi động theo thứ tự:
+> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer`
 
 * Kiểm tra tất cả services đã healthy:
 
@@ -72,9 +69,13 @@ docker-compose ps
 | Airflow Webserver | http://localhost:8080 | admin / admin |
 | Kafka Control Center | http://localhost:9021 | _(không cần đăng nhập)_ |
 
-* Trong Airflow UI, bật DAG **`funding_rates_automation`** (mặc định bị tắt). DAG sẽ tự chạy **[1 phút](dags/kafka_stream.py#L133)**/lần, gọi ATX API → produce vào Kafka topic `funding_rates`.
+* Mở Airflow UI và bật DAG **`funding_rates_automation`** (mặc định bị tắt). DAG sẽ tự chạy **[15 phút](dags/kafka_stream.py#L143)**/lần với 3 tasks chạy tuần tự:
 
-* Service `consumer` tự động consume messages từ message queue của topic `funding_rates` --> insert vào PostgreSQL (`postgres_data`).
+  1. **`stream_data_from_api`** — Gọi ATX API, produce funding rates vào Kafka topic `funding_rates`
+  2. **`wait_for_consumer`** — `PythonSensor` poll Postgres mỗi 5 giây, chờ ít nhất 1 row mới được insert vào bảng `funding_rates` (timeout 5 phút)
+  3. **`dbt_run`** — Chạy `dbt run` ngay khi consumer xử lý xong --> update view `stg_funding_rates` và bảng `fct_funding_rates`
+
+* Chờ cho service `consumer` tự động consume data từ message queue của topic `funding_rates` --> insert data đó vào bảng `funding_rates` trong PostgreSQL.
 
   > **Lưu ý:** Consumer hiện đang được config [`auto_offset_reset="earliest"`](consumers/kafka_consumer.py#L49) — tức là lần đầu chạy (chưa có committed offset) sẽ đọc **toàn bộ messages từ đầu topic**. Những lần sau sẽ tiếp tục từ offset đã committed.
 
@@ -84,7 +85,7 @@ docker-compose ps
 docker exec -it postgres_data psql -U trading -d trading -c "SELECT * FROM funding_rates ORDER BY ingested_at DESC LIMIT 20;"
 ```
 
-* Service `dbt` sẽ tự động chạy **[mỗi 60 giây](docker-compose.yml#L222)**, transform data từ bảng `funding_rates` thành bảng mart `fct_funding_rates`.
+* Chờ cho dbt tự động trigger bởi Airflow (task `dbt_run`) sau khi consumer đã insert **đủ toàn bộ records** của DAG run đó vào PostgreSQL. Sensor tracking tổng số records qua XCom — chỉ khi `COUNT(*) >= total_sent` thì `dbt_run` mới được kích hoạt. Table `fct_funding_rates` sẽ được cập nhật **1 lần/DAG run**, sau khi tất cả batches đã được consume xong.
 
   | Model | Materialization | Mô tả |
   |---|---|---|
@@ -95,13 +96,6 @@ docker exec -it postgres_data psql -U trading -d trading -c "SELECT * FROM fundi
 
   ```bash
   docker exec -it postgres_data psql -U trading -d trading -c "SELECT base_asset, funding_rate, funding_rate_category, is_attractive FROM fct_funding_rates ORDER BY funding_rate ASC;"
-  ```
-
-  Chạy dbt thủ công (debug, test):
-
-  ```bash
-  docker-compose run --rm dbt dbt run
-  docker-compose run --rm dbt dbt test
   ```
 
 * (Optional) Dừng toàn bộ services sau khi dùng xong:
