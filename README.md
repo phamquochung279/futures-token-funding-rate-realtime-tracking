@@ -1,5 +1,7 @@
 # ATX Futures Tokens' Funding Rates
 
+([English below](#english-version))
+
 ## 1. Project Flow
 
 <a href="ATX%20Funding%20Rates%20Project%20Architecture.png" target="_blank">
@@ -146,3 +148,157 @@ docker-compose down
 Author: Phạm Quốc Hùng <br />
 
 <a href="mailto:pham.quochung0999@gmail.com">![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)</a> <a href="https://public.tableau.com/app/profile/hung.pham279">![Tableau](https://img.shields.io/badge/Tableau-E97627?style=for-the-badge&logo=Tableau&logoColor=white)</a> <a href="https://github.com/phamquochung279">![Github](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)</a> <a href="https://www.linkedin.com/in/pham-quochung/">![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)</a>
+
+---
+
+## English Version
+
+# ATX Futures Tokens' Funding Rates
+
+## 1. Project Flow
+
+<a href="ATX%20Funding%20Rates%20Project%20Architecture.png" target="_blank">
+  <img src="ATX%20Funding%20Rates%20Project%20Architecture.png" alt="ATX Funding Rates Project Architecture" title="ATX Funding Rates Project Architecture" width="100%">
+</a>
+
+## 2. Background Story
+
+If you are a crypto trader or working in crypto, you must have heard of a mechanism called the *funding fees*, created to keep a token's futures price and spot price closely aligned. At its core, it works like this:
+
+- If a token has a **positive** funding rate *(funding payment rate)*, people who are holding **Long** positions of said token must **pay funding fees** to the **Short** side.
+- Conversely, if funding rates are **negative**, the **Short** side pays funding fees to the **Long** side.
+
+So, in order to take advantage of this mechanism, experienced traders would "abuse" this strategy:
+1) Find tokens with negative funding rates (can be as low as -2)
+2) Open a Long position
+3) Hold onto position for dear life (HODL) to earn funding fees
+
+> At ATX, I myself witnessed an absolute legend earning **~50 million VND (~$1,900)** in funding fees after holding a Long position for **2 full weeks**. Made me think a lot about my salary and career choices.
+
+This project is based on one of the tasks I used to do at ATX: help the Community Manager look for tokens with attractive funding rates --> if there's any, alert the "whales" (VIP traders) ASAP --> the whales are inclined trade more. Cha-ching for us.
+
+I built this project partly to refresh my data skills, and partly as a tribute to my time in crypto with ATX. Tough but memorable days.
+
+<video src="https://github.com/user-attachments/assets/7286d209-e0df-46ad-956d-fe963b4dbbe0" controls width="100%"></video>
+
+<p align="center"><em>Me (left) & my ATX lads at GM Vietnam 2025</em></p>
+
+## 3. Setup & Run Locally
+
+* Install and run [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+
+* Clone this repository to your local machine:
+
+```bash
+git clone <repo-url>
+cd notable-tokens-realtime-tracking
+```
+
+* Create the .venv folder and install libraries from requirements.txt
+
+```
+pip install -r requirements.txt
+```
+
+> Do not confuse it with [requirements-dags.txt](requirements-dags.txt) — that file contains additional packages for the Airflow containers (`webserver` & `scheduler`) in Docker.
+
+* Build images and start services with Docker Compose:
+
+```bash
+docker-compose up -d --build
+```
+
+> The first run will take a few minutes to build images ([dags/Dockerfile](dags/Dockerfile), [consumers/Dockerfile](consumers/Dockerfile)) and pull the remaining images. Services start in this order:
+> `Zookeeper` → `Kafka Broker` → `Schema Registry` + `Control Center` → `Postgres` → `Airflow Webserver` → `Airflow Scheduler` → `Kafka Consumer`
+
+* Check that all services are healthy:
+
+```bash
+docker-compose ps
+```
+
+* Access the UIs:
+
+| Service | URL | Credentials |
+|---|---|---|
+| Airflow Webserver | http://localhost:8080 | admin / admin |
+| Kafka Control Center | http://localhost:9021 | _(no login required)_ |
+
+* Open the Airflow UI and enable DAG **`funding_rates_automation`** (disabled by default). The DAG runs automatically every **[15 minutes](dags/kafka_stream.py#L143)** with 3 sequential tasks:
+
+  1. **`stream_data_from_api`** — Call the ATX API and produce funding rates to Kafka topic `funding_rates`
+  2. **`wait_for_consumer`** — `PythonSensor` polls Postgres every 5 seconds, waiting for at least 1 new row inserted into table `funding_rates` (5-minute timeout)
+  3. **`dbt_run`** — Run `dbt run` right after the consumer finishes processing --> update view `stg_funding_rates` and table `fct_funding_rates`
+
+* Wait for the `consumer` service to automatically consume data from the message queue of topic `funding_rates` --> then insert that data into table `funding_rates` in PostgreSQL.
+
+  > **Note:** The consumer is currently configured with [`auto_offset_reset="earliest"`](consumers/kafka_consumer.py#L49) — meaning on first run (with no committed offset), it will read **all messages from the beginning of the topic**. Later runs continue from the committed offset.
+
+* Check inserted data in PostgreSQL (port `5433` is exposed to host):
+
+```bash
+docker exec -it postgres_data psql -U trading -d trading -c "SELECT * FROM funding_rates ORDER BY ingested_at DESC LIMIT 20;"
+```
+
+* Wait for dbt to be automatically triggered by Airflow (task `dbt_run`) after the consumer has inserted **the full set of records** for that DAG run into PostgreSQL. The sensor tracks total records via XCom — only when `COUNT(*) >= total_sent` will `dbt_run` be triggered. Table `fct_funding_rates` will be updated **once per DAG run**, after all batches are fully consumed.
+
+  | Model | Materialization | Description |
+  |---|---|---|
+  | `stg_funding_rates` | view | Filter rows where `funding_rate IS NULL`, convert `event_time` (ms) → `event_at` (timestamptz) |
+  | `fct_funding_rates` | table | Add `funding_rate_category` by thresholds `-0.3/-0.8/-1.2/-2`, add `is_attractive` flag |
+
+  Check mart table:
+
+  ```bash
+  docker exec -it postgres_data psql -U trading -d trading -c "SELECT base_asset, funding_rate, funding_rate_category, is_attractive FROM fct_funding_rates ORDER BY funding_rate ASC;"
+  ```
+
+* (Optional) Stop all services after use:
+
+```bash
+docker-compose down
+```
+
+> Add the `-v` flag if you also want to remove data volumes: `docker-compose down -v`
+
+---
+
+## 4. Notes For Running This Project In Production
+
+### Security
+
+- **Change all default passwords** in `docker-compose.yml` before deploying. Current values are:
+  - Airflow DB: `airflow / airflow`
+  - Trading DB: `trading / trading`
+  - Airflow Webserver Secret Key: `this_is_a_very_secured_key`
+- Do not commit credentials to Git. Use **Docker Secrets** or a `.env` file (already added to `.gitignore`).
+- Do not expose port `5433` (PostgreSQL) to the public internet. Use firewall rules or allow internal network only.
+
+### Reliability
+
+- **Airflow Executor**: On local I am using `SequentialExecutor` (only one task runs at a time) --> in production you should switch to `LocalExecutor` or `CeleryExecutor` for parallel processing. To change executor, update **2 places** in `docker-compose.yml`: [webserver (L116)](docker-compose.yml#L116) and [scheduler (L151)](docker-compose.yml#L151).
+- **Kafka Replication Factor**: Currently set to `1` (single broker, no replicas). If the broker dies, data is lost. In production, use at least 3 brokers with `replication.factor=3`.
+- **Consumer restart policy**: The `consumer` service already has `restart: always` — ensuring automatic restart if it crashes.
+- Add **persistent volumes** for `postgres_data` so data is not lost when containers restart:
+  ```yaml
+  volumes:
+    - postgres_data_volume:/var/lib/postgresql/data
+  ```
+
+### Monitoring & Observability
+
+- Kafka **Control Center** at `http://<server-ip>:9021` lets you monitor consumer lag and throughput of topic `funding_rates`.
+- View Airflow task logs at `http://<server-ip>:8080` or in folder `./logs/`.
+- Consider adding alerting (email, Slack, Discord, etc.) for Airflow DAG failures via `on_failure_callback` in `default_args`.
+
+### Rate Limiting
+
+- The ATX API currently has only 7 tokens, so `BATCH_SIZE` 10 and `BATCH_DELAY` 10s between batches are only symbolic and have no real impact on how the project runs.
+- If the token count increases, adjust `BATCH_SIZE` and `BATCH_DELAY` in [dags/kafka_stream.py](dags/kafka_stream.py) to avoid IP blocking.
+
+## Contact
+
+Author: Phạm Quốc Hùng <br />
+
+<a href="mailto:pham.quochung0999@gmail.com">![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)</a> <a href="https://public.tableau.com/app/profile/hung.pham279">![Tableau](https://img.shields.io/badge/Tableau-E97627?style=for-the-badge&logo=Tableau&logoColor=white)</a> <a href="https://github.com/phamquochung279">![Github](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)</a> <a href="https://www.linkedin.com/in/pham-quochung/">![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)</a>
+
